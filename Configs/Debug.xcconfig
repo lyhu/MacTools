@@ -1,4 +1,0 @@
-#include? "../LocalConfig.xcconfig"
-
-SWIFT_STRICT_CONCURRENCY = complete
-PLUGIN_CATALOG_PUBLIC_KEY = V7knIDPAmvC9rhCB3k3EQnSR+ZKiUlA12AIAgg/ajVk=
