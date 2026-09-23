@@ -26,6 +26,7 @@ typealias AIAssistantProviderFactory = () -> Result<ResolvedAIProvider, AIAssist
 final class AIAssistantCoordinator {
     private let selectedTextCapturePipeline: any SelectedTextCaptureProviding
     private let providerFactory: AIAssistantProviderFactory
+    private let clipboardTextProvider: () -> String?
     private weak var panelController: AIAssistantPanelControlling?
     private let localization: PluginLocalization
 
@@ -51,10 +52,12 @@ final class AIAssistantCoordinator {
         selectedTextCapturePipeline: any SelectedTextCaptureProviding,
         providerFactory: @escaping AIAssistantProviderFactory,
         panelController: AIAssistantPanelControlling?,
+        clipboardTextProvider: @escaping () -> String? = { NSPasteboard.general.string(forType: .string) },
         localization: PluginLocalization = PluginLocalization(bundle: .main)
     ) {
         self.selectedTextCapturePipeline = selectedTextCapturePipeline
         self.providerFactory = providerFactory
+        self.clipboardTextProvider = clipboardTextProvider
         self.panelController = panelController
         self.localization = localization
     }
@@ -87,6 +90,29 @@ final class AIAssistantCoordinator {
         activeTask?.cancel()
         activeTask = Task { [weak self] in
             await self?.runProcessing(prompt: prompt)
+        }
+    }
+
+    /// Processes the clipboard only when the user explicitly selected the
+    /// clipboard shortcut mode in settings. This path does not simulate copy.
+    func startProcessingClipboard(prompt: AIAssistantPrompt) {
+        retainResultForRerun()
+        activeTask?.cancel()
+        activeTask = nil
+        let currentSessionID = UUID()
+        sessionID = currentSessionID
+        lastPrompt = prompt
+        let sourceText = clipboardTextProvider()?.trimmingCharacters(in: .whitespacesAndNewlines)
+        lastSourceText = sourceText
+
+        guard let sourceText, !sourceText.isEmpty else {
+            setError(.missingClipboardText, sourceText: nil)
+            present(snapshot)
+            return
+        }
+
+        activeTask = Task { [weak self] in
+            await self?.process(sourceText: sourceText, prompt: prompt, sessionID: currentSessionID)
         }
     }
 
